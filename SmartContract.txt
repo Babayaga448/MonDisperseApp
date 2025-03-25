@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MonDisperse {
+    event Dispersed(address indexed sender, address[] recipients, uint256[] amounts);
+
+    function disperseMON(address[] calldata recipients, uint256[] calldata amounts) external payable {
+        require(recipients.length == amounts.length, "Mismatched input lengths");
+        uint256 totalAmount = 0;
+        
+        for (uint256 i = 0; i < amounts.length; i++) {
+            totalAmount += amounts[i];
+        }
+        
+        require(msg.value >= totalAmount, "Insufficient MON sent");
+        
+        for (uint256 i = 0; i < recipients.length; i++) {
+            payable(recipients[i]).transfer(amounts[i]);
+        }
+        
+        emit Dispersed(msg.sender, recipients, amounts);
+    }
+}
