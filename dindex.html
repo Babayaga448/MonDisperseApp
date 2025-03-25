@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MON Disperse App</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
+    <style>
+        body {
+            background-color: #2a0033;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        button {
+            background-color: #993399;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px;
+            display: block;
+            width: 85%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        input, textarea {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        footer {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MON Disperse App</h1>
+    <h3>Need to send MON to multiple wallets? No worries!</h3>
+    <button onclick="connectWallet()">Connect Wallet</button>
+    <p>Wallet Address: <span id="walletAddress">Not Connected</span></p>
+    <p>MON Balance: <span id="monBalance">0</span></p>
+    <h4>Input recipient address here in the following format:</h4>
+    <textarea id="recipients" rows="5" placeholder="0xeE66d80FeCddbf65848F1d7FceD4E2c1B49a2e4b 3.141592
+0x5AC9E0a8A2bb53380484A4a25414072e02257623,2.7182
+0xa46965e644CA8706649A82584345632F7261b83d=1.41421"></textarea>
+    <button onclick="disperseMON()">Disperse MON</button>
+    <footer>
+        Made with Love by <a href="https://x.com/Babayaga4487_" target="_blank" style="color:lightpurple;">Babayaga</a>
+    </footer>
+    <script>
+        let web3;
+        let contract;
+        let userAccount;
+        
+        const CONTRACT_ADDRESS = "0x5a74E72717d363105887E44023710d2fA54C2471";
+        const ABI = [
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "address", "name": "sender", "type": "address"},
+                    {"indexed": false, "internalType": "address[]", "name": "recipients", "type": "address[]"},
+                    {"indexed": false, "internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}
+                ],
+                "name": "Dispersed",
+                "type": "event"
+            },
+            {
+                "inputs": [
+                    {"internalType": "address[]", "name": "recipients", "type": "address[]"},
+                    {"internalType": "uint256[]", "name": "amounts", "type": "uint256[]"}
+                ],
+                "name": "disperseMON",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            }
+        ];
+        
+        async function connectWallet() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const accounts = await web3.eth.getAccounts();
+                userAccount = accounts[0];
+                document.getElementById("walletAddress").innerText = userAccount;
+                contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
+                updateBalance();
+            } else {
+                alert("Please install MetaMask");
+            }
+        }
+        
+        async function updateBalance() {
+            if (!web3 || !userAccount) return;
+            let balance = await web3.eth.getBalance(userAccount);
+            document.getElementById("monBalance").innerText = web3.utils.fromWei(balance, 'ether');
+        }
+        
+        async function disperseMON() {
+            if (!web3 || !userAccount) {
+                alert("Connect your wallet first.");
+                return;
+            }
+            let input = document.getElementById("recipients").value;
+            let lines = input.split(/\n/);
+            let recipients = [];
+            let amounts = [];
+            let totalAmount = BigInt(0);
+            
+            for (let line of lines) {
+                let parts = line.replace(/[,=]/g, ' ').trim().split(/\s+/);
+                if (parts.length === 2) {
+                    let address = parts[0];
+                    let amount = BigInt(web3.utils.toWei(parts[1], 'ether'));
+                    recipients.push(address);
+                    amounts.push(amount.toString());
+                    totalAmount += amount;
+                }
+            }
+
+            console.log("Recipients:", recipients);
+            console.log("Amounts:", amounts);
+            console.log("Total Amount:", web3.utils.fromWei(totalAmount.toString(), 'ether'));
+            
+            if (recipients.length === 0 || amounts.length === 0) {
+                alert("Please input valid addresses and amounts.");
+                return;
+            }
+            
+            try {
+                let balance = BigInt(await web3.eth.getBalance(userAccount));
+                if (balance < totalAmount) {
+                    alert("Insufficient funds for this transaction.");
+                    return;
+                }
+
+                await contract.methods.disperseMON(recipients, amounts).send({
+                    from: userAccount,
+                    value: totalAmount.toString()
+                });
+                alert("MON Dispersed Successfully");
+                updateBalance();
+            } catch (error) {
+                console.error("Transaction Error:", error);
+                alert("Transaction Failed: " + (error.message || "Unknown error"));
+            }
+        }
+    </script>
+</body>
+</html>
